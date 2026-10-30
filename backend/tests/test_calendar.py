@@ -155,3 +155,38 @@ def test_no_overlaps_query_is_empty(db):
 def test_local_range_is_local_midnight():
     start, end = cal.local_range(TUE, TUE)
     assert start == datetime(2026, 11, 2, 18, 30, tzinfo=timezone.utc) and end - start == timedelta(days=1)
+
+
+def test_concurrent_overlapping_inserts_do_not_deadlock(database):
+    """Guard for the deadlock the evaluation's random-load phase hit (overlapping inserts, exclusion check).
+
+    With the per-staff advisory lock every loser is a clean exclusion violation. This is a race, so it does not
+    reproduce the deadlock deterministically without the lock; the load phase in evaluation/run_eval.py did."""
+    with SessionLocal() as setup:
+        colour = cal.get_service(setup, "colour")
+        base = _slots(setup, code="colour")[0]
+    starts = [base.starts_at + timedelta(minutes=15 * i) for i in range(6)]   # 90-min bookings 0-75 min apart: all overlap
+    barrier, results, errors, causes = threading.Barrier(len(starts)), [], [], []
+
+    def attempt(i: int, start) -> None:
+        slot = cal.Slot(base.staff_id, base.staff_name, "colour", start, start + timedelta(minutes=colour.duration_min))
+        with SessionLocal() as s:
+            barrier.wait()
+            try:
+                cal.create_booking(s, slot, name=f"Over{i}", phone_e164=f"+9198000002{i:02d}", idempotency_key=None)
+                s.commit()
+                results.append("ok")
+            except cal.SlotTaken as exc:
+                s.rollback()
+                results.append("taken")
+                causes.append(exc.__cause__.orig.sqlstate)
+            except Exception as exc:   # anything else is a failure of this test
+                errors.append(repr(exc))
+
+    threads = [threading.Thread(target=attempt, args=(i, st)) for i, st in enumerate(starts)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == [] and results.count("ok") == 1
+    assert set(causes) == {cal.NO_OVERLAP_SQLSTATE}

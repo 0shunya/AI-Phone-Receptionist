@@ -13,8 +13,8 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_settings
@@ -23,6 +23,7 @@ from app.models import Booking, BookingStatus, Customer, Service, Staff
 UTC = timezone.utc
 NO_OVERLAP_SQLSTATE = "23P01"   # exclusion_violation
 UNIQUE_SQLSTATE = "23505"
+DEADLOCK_SQLSTATE = "40P01"
 
 
 class CalendarError(Exception):
@@ -158,8 +159,23 @@ class LocalCalendar:
 calendar_sync: CalendarSync = LocalCalendar()
 
 
-def _sqlstate(exc: IntegrityError) -> str | None:
+def _sqlstate(exc: DBAPIError) -> str | None:
     return getattr(exc.orig, "sqlstate", None)
+
+
+def lock_staff_calendar(db: Session, staff_id: uuid.UUID) -> None:
+    """Serialise booking writes per staff member until this transaction ends.
+
+    The exclusion constraint alone is correct but, when two transactions insert overlapping rows at the same time,
+    each waits on the other's uncommitted row and Postgres breaks the cycle with a deadlock error (found by the
+    evaluation's load test). Taking this lock first means the second writer waits, then sees the committed row and
+    gets a clean exclusion violation. The constraint is still what guarantees correctness.
+    """
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": f"staff:{staff_id}"})
+
+
+def _refused(exc: DBAPIError) -> bool:
+    return _sqlstate(exc) in (NO_OVERLAP_SQLSTATE, DEADLOCK_SQLSTATE)
 
 
 def upsert_customer(db: Session, name: str, phone_e164: str) -> Customer:
@@ -185,12 +201,13 @@ def create_booking(db: Session, slot: Slot, *, name: str, phone_e164: str, idemp
     booking = Booking(customer_id=customer.id, staff_id=slot.staff_id, service_id=service.id,
                       starts_at=slot.starts_at, ends_at=slot.ends_at, status=BookingStatus.confirmed,
                       idempotency_key=idempotency_key, call_id=call_id)
+    lock_staff_calendar(db, slot.staff_id)
     try:
         with db.begin_nested():
             db.add(booking)
             db.flush()
-    except IntegrityError as exc:
-        if _sqlstate(exc) == NO_OVERLAP_SQLSTATE:
+    except DBAPIError as exc:
+        if _refused(exc):
             raise SlotTaken() from exc
         if _sqlstate(exc) == UNIQUE_SQLSTATE and idempotency_key:
             existing = db.scalar(select(Booking).where(Booking.idempotency_key == idempotency_key))
@@ -206,14 +223,15 @@ def reschedule_booking(db: Session, booking: Booking, slot: Slot) -> Booking:
         raise CalendarError("booking_cancelled", "That booking was cancelled.")
     service = get_service(db, slot.service_code)
     previous = (booking.staff_id, booking.service_id, booking.starts_at, booking.ends_at)
+    lock_staff_calendar(db, slot.staff_id)
     try:
         with db.begin_nested():
             booking.staff_id, booking.service_id = slot.staff_id, service.id
             booking.starts_at, booking.ends_at = slot.starts_at, slot.ends_at
             db.flush()
-    except IntegrityError as exc:
+    except DBAPIError as exc:
         booking.staff_id, booking.service_id, booking.starts_at, booking.ends_at = previous
-        if _sqlstate(exc) == NO_OVERLAP_SQLSTATE:
+        if _refused(exc):
             raise SlotTaken() from exc
         raise
     booking.event_id = calendar_sync.upsert_event(booking)
@@ -232,7 +250,7 @@ def cancel_booking(db: Session, booking: Booking, reason: str | None) -> Booking
 
 def upcoming_bookings(db: Session, phone_e164: str, *, now: datetime) -> list[Booking]:
     return list(db.scalars(select(Booking).join(Customer).options(
-        selectinload(Booking.service), selectinload(Booking.staff)).where(
+        selectinload(Booking.service), selectinload(Booking.staff), selectinload(Booking.customer)).where(
         Customer.phone_e164 == phone_e164, Booking.status == BookingStatus.confirmed,
         Booking.starts_at >= now).order_by(Booking.starts_at).limit(5)))
 
