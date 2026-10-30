@@ -1,0 +1,10 @@
+# Runtime dependencies (mirrors pyproject.toml; used by hosts that install from requirements.txt)
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+SQLAlchemy==2.1.6
+alembic==1.20.1
+psycopg[binary]==3.3.6
+pydantic==2.14.1
+pydantic-settings==2.16.1
+google-genai==2.33.0
+tzdata==2026.1

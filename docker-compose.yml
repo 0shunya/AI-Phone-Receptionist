@@ -1,0 +1,38 @@
+# Local development:
+#   docker compose up -d db                 # PostgreSQL 16 on localhost:5434
+#   docker compose --profile app up --build # PostgreSQL + API (http://localhost:8000)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reception
+      POSTGRES_PASSWORD: reception
+      POSTGRES_DB: reception
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/scripts/init-test-dbs.sql:/docker-entrypoint-initdb.d/10-test-dbs.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reception -d reception"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    profiles: ["app"]
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://reception:reception@db:5432/reception
+      FRONTEND_ORIGIN: http://localhost:5173
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

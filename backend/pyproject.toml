@@ -1,0 +1,35 @@
+[project]
+name = "ai-phone-receptionist"
+version = "1.0.0"
+description = "Voice booking agent: a state machine around the model, narrow tools, a Postgres calendar that refuses double bookings, and human handoff."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.162.0",
+  "uvicorn[standard]==0.54.0",
+  "SQLAlchemy==2.1.6",
+  "alembic==1.20.1",
+  "psycopg[binary]==3.3.6",
+  "pydantic==2.14.1",
+  "pydantic-settings==2.16.1",
+  "google-genai==2.33.0",
+  "tzdata==2026.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "httpx==0.28.1"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", ".."]
+addopts = "-q -m 'not live'"
+markers = [
+  "live: calls the real Gemini API (needs GEMINI_API_KEY and quota); run with -m live",
+  "postgres: needs TEST_DATABASE_URL pointing at a disposable PostgreSQL database (skipped when unreachable)",
+]
