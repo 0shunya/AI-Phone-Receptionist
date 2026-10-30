@@ -8,9 +8,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
-      port: 5173,
+      port: 5174,
+      strictPort: true,
       // In development the browser calls /api (and the /api/voice/stream WebSocket) on Vite, which forwards to FastAPI.
-      proxy: { "/api": { target: env.VITE_DEV_API_TARGET || "http://localhost:8000", ws: true } },
+      proxy: { "/api": { target: env.VITE_DEV_API_TARGET || "http://localhost:8010", ws: true } },
     },
     build: { sourcemap: false },
     test: {

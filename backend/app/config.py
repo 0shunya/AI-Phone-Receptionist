@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     currency_word: str = "rupees"
 
     # Browser access
-    frontend_origin: str = "http://localhost:5173"
+    frontend_origin: str = "http://localhost:5174"
     demo_access_code: str | None = None
     turns_per_minute_per_call: int = Field(default=20, ge=1)
     calls_per_hour_per_client: int = Field(default=30, ge=1)

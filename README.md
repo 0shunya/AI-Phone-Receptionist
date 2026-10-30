@@ -104,7 +104,7 @@ docker compose up -d db
 ```
 
 ```bash
-cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt && cp .env.example .env && .venv/Scripts/python -m alembic upgrade head && .venv/Scripts/python -m scripts.seed --demo && .venv/Scripts/python -m uvicorn app.main:app --port 8000
+cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt && cp .env.example .env && .venv/Scripts/python -m alembic upgrade head && .venv/Scripts/python -m scripts.seed --demo && .venv/Scripts/python -m uvicorn app.main:app --port 8010
 ```
 
 ```bash
@@ -112,7 +112,7 @@ cd frontend && npm install && npm run dev
 ```
 
 (On macOS/Linux use `.venv/bin/` instead of `.venv/Scripts/`.) Put your `GEMINI_API_KEY` in `backend/.env`, or set
-`AGENT_BRAIN=rules` to run without a key. Open http://localhost:5173, press **Start call**, and talk (Chrome or Edge)
+`AGENT_BRAIN=rules` to run without a key. Open http://localhost:5174, press **Start call**, and talk (Chrome or Edge)
 or type.
 
 ## Tests

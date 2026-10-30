@@ -74,7 +74,7 @@ key on the free tier in Google AI Studio.
 docker compose --profile app up --build
 ```
 
-This builds `backend/Dockerfile` and runs it against the compose database on `http://localhost:8000`, reading
+This builds `backend/Dockerfile` and runs it against the compose database on `http://localhost:8010`, reading
 `backend/.env` if it exists.
 
 ## Adding a real phone number (not built)

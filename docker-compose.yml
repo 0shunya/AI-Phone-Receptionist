@@ -1,6 +1,10 @@
+# Fixed project name and host ports so this stack can run beside the other roadmap builds
+# (Expense Scanner: 8000/5173/5433; Deep Research: 8020/5183/5436).
+name: ai-phone-receptionist
+
 # Local development:
 #   docker compose up -d db                 # PostgreSQL 16 on localhost:5434
-#   docker compose --profile app up --build # PostgreSQL + API (http://localhost:8000)
+#   docker compose --profile app up --build # PostgreSQL + API (http://localhost:8010)
 services:
   db:
     image: postgres:16-alpine
@@ -27,9 +31,9 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql+psycopg://reception:reception@db:5432/reception
-      FRONTEND_ORIGIN: http://localhost:5173
+      FRONTEND_ORIGIN: http://localhost:5174
     ports:
-      - "8000:8000"
+      - "8010:8000"
     depends_on:
       db:
         condition: service_healthy
