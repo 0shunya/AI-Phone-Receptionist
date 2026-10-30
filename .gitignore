@@ -25,3 +25,6 @@ evaluation/results/runs/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local tool config (machine-specific paths)
+.claude/
