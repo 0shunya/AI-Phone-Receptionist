@@ -150,7 +150,8 @@ class Engine:
         tools: list[dict] = []
 
         def run(name: str, args: dict, actor: str) -> ToolResult:
-            ctx = ToolContext(db=db, call=call, caller_text=text, now=now, turn_seq=seq, actor=actor)
+            said = " ".join([t for speaker, t in history if speaker == "caller"] + [text])
+            ctx = ToolContext(db=db, call=call, caller_text=text, now=now, turn_seq=seq, actor=actor, caller_said=said)
             result = run_tool(ctx, name, args)
             tools.append({"tool": name, "args": args, "ok": result.ok, "error_code": result.error_code,
                           "actor": actor})

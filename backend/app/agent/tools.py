@@ -11,6 +11,7 @@ call to CONFIRM; the identical second call commits, and only if the caller's las
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -98,10 +99,10 @@ def tool_schemas(db: Session, names: list[str]) -> list[dict]:
                        "date_to": {"type": "string", "description": "Local end (inclusive day), e.g. 2026-11-03"},
                        "staff": {"type": "string", "enum": staff_names,
                                  "description": "Only if the caller asks for a particular person"}},
-        "find_bookings": {"phone_e164": {"type": "string", "description": "E.164, e.g. +919876543210"}},
+        "find_bookings": {"phone_e164": {"type": "string", "description": "E.164 with country code, as the caller said it"}},
         "book": {"slot_id": {"type": "string", "description": "An offered slot alias such as slot_1"},
                  "name": {"type": "string", "description": "The caller's name as they gave it"},
-                 "phone_e164": {"type": "string", "description": "E.164, e.g. +919876543210"}},
+                 "phone_e164": {"type": "string", "description": "Caller ID, or the number the caller said, in E.164"}},
         "reschedule": {"booking_id": {"type": "string", "description": "A booking alias such as booking_1"},
                        "new_slot_id": {"type": "string", "description": "An offered slot alias such as slot_2"}},
         "cancel": {"booking_id": {"type": "string", "description": "A booking alias such as booking_1"},
@@ -133,6 +134,7 @@ class ToolContext:
     now: datetime
     turn_seq: int | None = None
     actor: str = "model"                # model | guard (a deterministic rule called the tool)
+    caller_said: str = ""               # everything the caller has said on this call, for the phone guard
 
 
 class ToolError(Exception):
@@ -156,6 +158,18 @@ def _phone(raw: str) -> str:
     phone = to_e164(raw, get_settings().default_country_code)
     if phone is None:
         raise ToolError("invalid_phone", "I didn't get a valid phone number. Could you say it again, digit by digit?")
+    return phone
+
+
+def _heard_phone(ctx: ToolContext, raw: str) -> str:
+    """A phone number must be the caller ID or digits the caller actually said; the model may not invent one.
+
+    Added after a live run where, with caller ID withheld, the model filled in a number nobody had spoken."""
+    phone = _phone(raw)
+    said = re.sub(r"\D", "", ctx.caller_said)
+    national = phone[len(get_settings().default_country_code):] if phone.startswith(get_settings().default_country_code) else phone[1:]
+    if phone != ctx.call.caller_phone and national not in said and phone.lstrip("+") not in said:
+        raise ToolError("phone_not_heard", "What's the best phone number for the confirmation text?", failure=False)
     return phone
 
 
@@ -248,7 +262,7 @@ def find_slots(ctx: ToolContext, args: FindSlotsArgs) -> ToolResult:
 
 
 def find_bookings(ctx: ToolContext, args: FindBookingsArgs) -> ToolResult:
-    session, phone = _session(ctx.call), _phone(args.phone_e164)
+    session, phone = _session(ctx.call), _heard_phone(ctx, args.phone_e164)
     bookings = cal.upcoming_bookings(ctx.db, phone, now=ctx.now)
     tz = get_settings().tz
     session["phone"] = phone
@@ -325,7 +339,7 @@ def _taken(ctx: ToolContext, session: dict, slot_id: str, exclude: uuid.UUID | N
 
 def book(ctx: ToolContext, args: BookArgs) -> ToolResult:
     session = _session(ctx.call)
-    slot_id, phone, name = _slot_from_alias(session, args.slot_id), _phone(args.phone_e164), args.name.strip()
+    slot_id, phone, name = _slot_from_alias(session, args.slot_id), _heard_phone(ctx, args.phone_e164), args.name.strip()
     try:
         slot = cal.validate_slot(ctx.db, slot_id, now=ctx.now)
     except cal.SlotTaken:

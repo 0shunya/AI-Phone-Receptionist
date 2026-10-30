@@ -46,7 +46,7 @@ from scripts.seed import seed_reference  # noqa: E402
 FIXED_NOW = datetime(2026, 11, 2, 3, 30, tzinfo=timezone.utc)   # Mon 2 Nov 2026, 09:00 IST
 FILLER_PHONE = "+919899999999"
 INVALID_CALL_CODES = {"invalid_args", "unknown_slot", "unknown_booking", "tool_not_allowed", "unknown_tool",
-                      "invalid_phone", "invalid_date", "invalid_range", "unknown_service", "unknown_staff"}
+                      "invalid_phone", "invalid_date", "invalid_range", "unknown_service", "unknown_staff", "phone_not_heard"}
 BUSINESS_REFUSALS = {"slot_taken", "not_confirmed"}
 OVERLAP_SQL = text("""
     SELECT count(*) FROM bookings a JOIN bookings b ON a.staff_id = b.staff_id AND a.id < b.id

@@ -227,7 +227,7 @@ def test_model_calls_rows_are_written_by_the_observability_hook(db):
     engine.handle_turn(db, call.id, "hello")
     db.commit()
     row = db.scalar(select(ModelCall).where(ModelCall.call_id == call.id))
-    assert row.model == "gemini-test" and row.prompt_version == "receptionist-v2" and row.build == "build03"
+    assert row.model == "gemini-test" and row.prompt_version == "receptionist-v3" and row.build == "build03"
     assert db.get(Call, call.id).brain == "gemini:gemini-test"
 
 
@@ -259,3 +259,18 @@ def test_new_search_voids_the_pending_read_back_and_facts_show_aliases(db, call)
              {"service": "haircut", "date_from": "2026-11-05", "date_to": "2026-11-05"})
     assert "pending" not in call.session and call.state == State.CHECK_SLOTS
     assert "Waiting for a yes" not in render_facts(call.session)
+
+
+def test_book_refuses_a_phone_number_nobody_said(db, engine):
+    """Live-eval regression (s23): with caller ID withheld the model filled in a number the caller never gave."""
+    call, _ = engine.start_call(db, caller_phone=None, channel="simulation")
+    call.state = State.INTENT
+    run_tool(_ctx(db, call), "find_slots", {"service": "haircut", "date_from": "2026-11-03", "date_to": "2026-11-03"})
+    invented = run_tool(ToolContext(db=db, call=call, caller_text="the first one", now=FIXED_NOW,
+                                    caller_said="haircut tomorrow. the first one"), "book",
+                        {"slot_id": "slot_1", "name": "Raj", "phone_e164": "+919999999999"})
+    assert invented.error_code == "phone_not_heard" and call.state == State.CHECK_SLOTS
+    spoken = run_tool(ToolContext(db=db, call=call, caller_text="it's 98765 12345", now=FIXED_NOW,
+                                  caller_said="haircut tomorrow. it's 98765 12345"), "book",
+                      {"slot_id": "slot_1", "name": "Raj", "phone_e164": "+919876512345"})
+    assert spoken.ok and call.state == State.CONFIRM
