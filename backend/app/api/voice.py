@@ -139,6 +139,8 @@ async def voice_stream(ws: WebSocket, call_id: str, code: str | None = None):
         log.exception("voice stream failed", extra={"call_id": call_id})
     finally:
         reader_task.cancel()
+        # A closed tab or dropped connection is a hang-up (end_call is idempotent).
+        await asyncio.to_thread(_end, cid)
         try:
             await ws.close()
         except RuntimeError:

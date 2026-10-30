@@ -245,6 +245,8 @@ def run_scenario(scenario: dict, make_engine, make_caller) -> dict:
         "tools_forbidden": not any(t in ok_tools for t in expect.get("tools_forbidden", [])),
         "no_double_booking": overlaps() == 0,
     }
+    if handed_off:   # a handoff the caller never hears about is a failed handoff
+        checks["handoff_spoken"] = any("transferring you" in t[1] for t in transcripts[0] if t[0] == "agent")
     agent_lines = [t[1] for t in transcripts[0] if t[0] == "agent"][1:]
     for index, needle in (expect.get("agent_says") or {}).items():
         checks[f"agent_says_{index}"] = int(index) < len(agent_lines) and needle in agent_lines[int(index)]
@@ -432,6 +434,7 @@ def main() -> None:
     parser.add_argument("--publish", default="", help="also copy results to results/published/<name>")
     parser.add_argument("--pace", type=float, default=0.0, help="seconds to wait before each turn (live runs)")
     parser.add_argument("--stop-on-quota", action="store_true", default=True)
+    parser.add_argument("--strict", action="store_true", help="exit 1 if any scenario or concurrency check fails (CI)")
     args = parser.parse_args()
     global PACE_SECONDS
     PACE_SECONDS = args.pace
@@ -507,6 +510,9 @@ def main() -> None:
         write_report(out, meta, summary, cases, concurrency)
     print(json.dumps(summary, indent=2))
     print(f"wrote {targets[-1]}")
+    concurrency_ok = all(phase["passed"] for phase in (concurrency or {}).values() if phase)
+    if args.strict and (summary["passed"] != summary["scored"] or not concurrency_ok or summary["double_bookings"]):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -120,6 +120,7 @@ def test_saying_human_transfers_with_a_summary(db, engine, call):
     out = _say(engine, db, call, "actually can I talk to a real person")
     db.refresh(call)
     assert out.state == State.HANDOFF and call.handoff_reason == "caller_request"
+    assert "transferring you to a receptionist" in out.agent_text   # the caller must hear it, not just the DB
     assert call.handoff_status.value == "waiting" and "haircut" in call.summary and "\n" in call.summary
     after = _say(engine, db, call, "hello?")
     assert "receptionist will be with you" in after.agent_text
@@ -130,6 +131,7 @@ def test_two_failed_turns_hand_off(db, engine, call):
     out = _say(engine, db, call, "zzz qqq")
     db.refresh(call)
     assert out.state == State.HANDOFF and call.handoff_reason == "repeated_failure"
+    assert "transferring you to a receptionist" in out.agent_text
 
 
 def test_one_failure_then_success_resets_the_counter(db, engine, call):

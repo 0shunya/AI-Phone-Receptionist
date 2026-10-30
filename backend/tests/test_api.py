@@ -150,3 +150,17 @@ def test_call_rate_limit(client):
         assert r.status_code == 429 and r.json()["error"]["code"] == "rate_limited"
     finally:
         call_limiter.limit = 30
+
+
+def test_closing_the_stream_ends_the_call(client):
+    cid = client.post("/api/voice/incoming", json={"caller_phone": PHONE}).json()["call_id"]
+    with client.websocket_connect(f"/api/voice/stream?call_id={cid}") as ws:
+        ws.send_json({"type": "caller_turn", "text": "a haircut tomorrow please"})
+        while ws.receive_json()["type"] != "turn_done":
+            pass
+    import time
+    for _ in range(20):   # the server notices the disconnect asynchronously
+        if client.get(f"/api/calls/{cid}").json()["ended_at"]:
+            break
+        time.sleep(0.1)
+    assert client.get(f"/api/calls/{cid}").json()["ended_at"] is not None

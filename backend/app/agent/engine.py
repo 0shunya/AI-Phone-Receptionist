@@ -158,7 +158,8 @@ class Engine:
             return result
 
         def hand_off(reason: str) -> None:
-            run("transfer_to_human", {"reason": reason, "summary": summarize(call, reason, text)}, "guard")
+            result = run("transfer_to_human", {"reason": reason, "summary": summarize(call, reason, text)}, "guard")
+            stream.say(result.say)
 
         state = State(call.state)
         if state == State.HANDOFF:
@@ -202,7 +203,7 @@ class Engine:
         if decision.notes is not None:
             call.session = {**(call.session or {}), "brain_notes": decision.notes}
         if decision.fatal:
-            stream.say("I'm sorry, I'm having trouble on my side. Let me get a receptionist for you.")
+            stream.say("I'm sorry, I'm having trouble on my side.")
             hand_off("model_unavailable")
             return
         result = run(decision.tool, decision.args, "model") if decision.tool else None
@@ -217,7 +218,6 @@ class Engine:
         session["failed_turns"] = session.get("failed_turns", 0) + 1 if failed else 0
         call.session = session
         if session["failed_turns"] >= settings.max_failed_turns:
-            stream.say("Let me get a receptionist to help you with this.")
             hand_off("repeated_failure")
 
     def handoff(self, db: Session, call_id: uuid.UUID, reason: str, summary: str | None) -> Call:
