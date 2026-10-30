@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "label": "live-v3-handoff-recheck",
+    "run_at": "2026-10-30T17:16:04+00:00",
+    "clock": "2026-11-02T09:00:00+05:30",
+    "brain": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "caller": "scripted",
+    "caller_model": null,
+    "prompt_version": "receptionist-v3"
+  },
+  "summary": {
+    "scenarios": 6,
+    "scored": 6,
+    "infra_errors": 0,
+    "passed": 6,
+    "pass_rate": 1.0,
+    "end_state_accuracy": 1.0,
+    "handoff_when_required": "6/6",
+    "false_handoffs": "0/0",
+    "required_tools_called": 1.0,
+    "forbidden_tool_violations": 0,
+    "model_tool_calls": 4,
+    "invalid_model_tool_calls": 0,
+    "invalid_by_code": {},
+    "business_refusals": {},
+    "double_bookings": 0,
+    "server_first_ms": {
+      "n": 7,
+      "p50": 750,
+      "p95": 2983
+    },
+    "server_total_ms": {
+      "n": 7,
+      "p50": 750,
+      "p95": 2983
+    },
+    "model_calls": {
+      "n": 4,
+      "errors": 0,
+      "latency_ms": {
+        "p50": 1165,
+        "p95": 2946
+      },
+      "first_token_ms": {
+        "p50": 1122,
+        "p95": 2940
+      },
+      "input_tokens_avg": 1202
+    },
+    "by_category": {
+      "angry_caller": "1/1",
+      "repeated_failure": "1/1",
+      "unknown_request": "2/2",
+      "wants_human": "2/2"
+    },
+    "simulated_calls_total": 6
+  },
+  "concurrency": null
+}

@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "label": "live-gemini-3.5-flash-lite-scripted",
+    "run_at": "2026-10-30T16:34:25+00:00",
+    "clock": "2026-11-02T09:00:00+05:30",
+    "brain": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "caller": "scripted",
+    "caller_model": null,
+    "prompt_version": "receptionist-v1"
+  },
+  "summary": {
+    "scenarios": 7,
+    "scored": 6,
+    "infra_errors": 1,
+    "passed": 5,
+    "pass_rate": 0.833,
+    "end_state_accuracy": 0.833,
+    "handoff_when_required": "2/2",
+    "false_handoffs": "1/4",
+    "required_tools_called": 1.0,
+    "forbidden_tool_violations": 0,
+    "model_tool_calls": 16,
+    "invalid_model_tool_calls": 2,
+    "invalid_by_code": {
+      "unknown_slot": 2
+    },
+    "business_refusals": {},
+    "double_bookings": 0,
+    "server_first_ms": {
+      "n": 16,
+      "p50": 1306,
+      "p95": 4170
+    },
+    "server_total_ms": {
+      "n": 17,
+      "p50": 1306,
+      "p95": 4180
+    },
+    "model_calls": {
+      "n": 17,
+      "errors": 1,
+      "latency_ms": {
+        "p50": 1225,
+        "p95": 4129
+      },
+      "first_token_ms": {
+        "p50": 1221,
+        "p95": 4128
+      },
+      "input_tokens_avg": 1460
+    },
+    "by_category": {
+      "cancel": "1/1",
+      "changes_mind": "0/1",
+      "reschedule": "1/1",
+      "simple_booking": "1/1",
+      "unknown_request": "1/1",
+      "wants_human": "1/1"
+    },
+    "simulated_calls_total": 7
+  },
+  "concurrency": null
+}

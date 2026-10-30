@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "label": "offline-rules-scripted",
+    "run_at": "2026-10-30T17:15:27+00:00",
+    "clock": "2026-11-02T09:00:00+05:30",
+    "brain": "rules",
+    "model": null,
+    "caller": "scripted",
+    "caller_model": null,
+    "prompt_version": "receptionist-v3"
+  },
+  "summary": {
+    "scenarios": 33,
+    "scored": 33,
+    "infra_errors": 0,
+    "passed": 33,
+    "pass_rate": 1.0,
+    "end_state_accuracy": 1.0,
+    "handoff_when_required": "6/6",
+    "false_handoffs": "0/27",
+    "required_tools_called": 1.0,
+    "forbidden_tool_violations": 0,
+    "model_tool_calls": 95,
+    "invalid_model_tool_calls": 0,
+    "invalid_by_code": {},
+    "business_refusals": {
+      "slot_taken": 1
+    },
+    "double_bookings": 0,
+    "server_first_ms": {
+      "n": 110,
+      "p50": 26,
+      "p95": 61
+    },
+    "server_total_ms": {
+      "n": 110,
+      "p50": 26,
+      "p95": 61
+    },
+    "model_calls": {
+      "n": 0,
+      "errors": 0,
+      "latency_ms": {
+        "p50": null,
+        "p95": null
+      },
+      "first_token_ms": {
+        "p50": null,
+        "p95": null
+      },
+      "input_tokens_avg": null
+    },
+    "by_category": {
+      "angry_caller": "1/1",
+      "background_noise": "3/3",
+      "cancel": "3/3",
+      "changes_mind": "4/4",
+      "no_false_handoff": "2/2",
+      "no_free_slot": "2/2",
+      "question_only": "1/1",
+      "question_then_booking": "1/1",
+      "race": "1/1",
+      "repeated_failure": "1/1",
+      "reschedule": "3/3",
+      "simple_booking": "7/7",
+      "unknown_request": "2/2",
+      "wants_human": "2/2"
+    },
+    "simulated_calls_total": 104
+  },
+  "concurrency": {
+    "burst": {
+      "calls": 10,
+      "booked": 1,
+      "slot_taken": 9,
+      "overlaps": 0,
+      "passed": true
+    },
+    "load": {
+      "calls": 60,
+      "workers": 8,
+      "confirmed_bookings": 56,
+      "booked_calls": 56,
+      "slot_taken_events": 44,
+      "overlaps": 0,
+      "server_total_ms": {
+        "p50": 110,
+        "p95": 240
+      },
+      "passed": true
+    }
+  }
+}

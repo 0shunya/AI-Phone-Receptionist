@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "label": "live-v2-gemini-3.5-flash-lite-scripted",
+    "run_at": "2026-10-30T16:48:39+00:00",
+    "clock": "2026-11-02T09:00:00+05:30",
+    "brain": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "caller": "scripted",
+    "caller_model": null,
+    "prompt_version": "receptionist-v2"
+  },
+  "summary": {
+    "scenarios": 33,
+    "scored": 33,
+    "infra_errors": 0,
+    "passed": 31,
+    "pass_rate": 0.939,
+    "end_state_accuracy": 0.939,
+    "handoff_when_required": "6/6",
+    "false_handoffs": "0/27",
+    "required_tools_called": 1.0,
+    "forbidden_tool_violations": 0,
+    "model_tool_calls": 98,
+    "invalid_model_tool_calls": 0,
+    "invalid_by_code": {},
+    "business_refusals": {
+      "slot_taken": 1
+    },
+    "double_bookings": 0,
+    "server_first_ms": {
+      "n": 106,
+      "p50": 1656,
+      "p95": 6403
+    },
+    "server_total_ms": {
+      "n": 109,
+      "p50": 1629,
+      "p95": 6403
+    },
+    "model_calls": {
+      "n": 108,
+      "errors": 2,
+      "latency_ms": {
+        "p50": 1527,
+        "p95": 6038
+      },
+      "first_token_ms": {
+        "p50": 1523,
+        "p95": 6036
+      },
+      "input_tokens_avg": 1462
+    },
+    "by_category": {
+      "angry_caller": "1/1",
+      "background_noise": "2/3",
+      "cancel": "3/3",
+      "changes_mind": "4/4",
+      "no_false_handoff": "1/2",
+      "no_free_slot": "2/2",
+      "question_only": "1/1",
+      "question_then_booking": "1/1",
+      "race": "1/1",
+      "repeated_failure": "1/1",
+      "reschedule": "3/3",
+      "simple_booking": "7/7",
+      "unknown_request": "2/2",
+      "wants_human": "2/2"
+    },
+    "simulated_calls_total": 34
+  },
+  "concurrency": null
+}
