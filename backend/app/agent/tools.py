@@ -234,6 +234,7 @@ def find_slots(ctx: ToolContext, args: FindSlotsArgs) -> ToolResult:
                                 exclude_booking=uuid.UUID(target) if target else None)
     session["service"] = service.code
     session.setdefault("intent", "book")
+    session.pop("pending", None)   # a new search voids any read-back the caller has not said yes to
     if not slots:
         session["offered_slots"] = {}
         ctx.call.session = session

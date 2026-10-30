@@ -227,7 +227,7 @@ def test_model_calls_rows_are_written_by_the_observability_hook(db):
     engine.handle_turn(db, call.id, "hello")
     db.commit()
     row = db.scalar(select(ModelCall).where(ModelCall.call_id == call.id))
-    assert row.model == "gemini-test" and row.prompt_version == "receptionist-v1" and row.build == "build03"
+    assert row.model == "gemini-test" and row.prompt_version == "receptionist-v2" and row.build == "build03"
     assert db.get(Call, call.id).brain == "gemini:gemini-test"
 
 
@@ -245,3 +245,17 @@ def test_slots_are_never_in_the_past_or_inside_notice(db, engine, call):
     offered = call.session.get("offered_slots", {})
     assert offered and all(
         cal.parse_slot_id(s["slot_id"])[2] >= FIXED_NOW + timedelta(minutes=60) for s in offered.values())
+
+
+def test_new_search_voids_the_pending_read_back_and_facts_show_aliases(db, call):
+    """Live-eval regression (s18): after "no, Thursday instead" the model copied the stale pending slot id."""
+    from app.llm.prompts import render_facts
+    call.state = State.INTENT
+    run_tool(_ctx(db, call), "find_slots", {"service": "haircut", "date_from": "2026-11-03", "date_to": "2026-11-03"})
+    run_tool(_ctx(db, call), "book", {"slot_id": "slot_1", "name": "Zara", "phone_e164": PHONE})
+    facts = render_facts(call.session)
+    assert "Waiting for a yes on: book {'slot_id': 'slot_1'" in facts and ".haircut." not in facts
+    run_tool(_ctx(db, call, "actually no, Thursday"), "find_slots",
+             {"service": "haircut", "date_from": "2026-11-05", "date_to": "2026-11-05"})
+    assert "pending" not in call.session and call.state == State.CHECK_SLOTS
+    assert "Waiting for a yes" not in render_facts(call.session)

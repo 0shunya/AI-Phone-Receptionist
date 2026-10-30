@@ -1,6 +1,6 @@
 """Versioned prompts. Every model call logs PROMPT_VERSION, so a regression can be traced to a prompt change."""
 
-PROMPT_VERSION = "receptionist-v1"
+PROMPT_VERSION = "receptionist-v2"
 
 SYSTEM_TEMPLATE = """You are the phone receptionist for {business}, a salon. You are on a live voice call.
 Speak like a friendly, efficient human receptionist: one or two short sentences, no lists, no markdown, no emoji.
@@ -44,5 +44,13 @@ def render_facts(session: dict) -> str:
     for alias, booking in (session.get("bookings") or {}).items():
         lines.append(f"Existing {alias}: {booking['service']} {booking['when']} with {booking['staff']}")
     if session.get("pending"):
-        lines.append(f"Waiting for a yes on: {session['pending']['tool']} {session['pending']['args']}")
+        pending = session["pending"]
+        lines.append(f"Waiting for a yes on: {pending['tool']} {_aliased(session, pending['args'])}")
     return "\n".join(lines) or "Nothing yet."
+
+
+def _aliased(session: dict, args: dict) -> dict:
+    """Show the model only aliases it may use, never raw ids (a live run caught it copying a stale slot id)."""
+    names = {v["slot_id"]: k for k, v in (session.get("offered_slots") or {}).items()}
+    names |= {v["booking_id"]: k for k, v in (session.get("bookings") or {}).items()}
+    return {key: names.get(value, value) for key, value in args.items()}
