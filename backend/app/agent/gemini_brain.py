@@ -20,7 +20,7 @@ def build_request(ctx: TurnContext) -> ChatRequest:
     system = SYSTEM_TEMPLATE.format(
         business=ctx.business_name, now_local=ctx.now_local.strftime("%A %d %B %Y, %H:%M"),
         timezone=settings.business_timezone, caller_phone=ctx.caller_phone or "withheld", services=services,
-        hours=ctx.hours_text, state=ctx.state, tools=", ".join(ctx.allowed_tools) or "none",
+        hours=ctx.hours_text, staff=", ".join(ctx.staff_names) or "unknown", state=ctx.state, tools=", ".join(ctx.allowed_tools) or "none",
         facts=render_facts(ctx.session))
     messages: list[tuple[str, str]] = [("user", "(The call has connected.)")]
     for speaker, text in [*ctx.history[-settings.agent_history_turns:], ("caller", ctx.caller_text)]:

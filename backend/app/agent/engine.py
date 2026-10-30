@@ -195,7 +195,8 @@ class Engine:
                           tool_schemas=tool_schemas(db, allowed), session=dict(call.session or {}),
                           history=history, caller_text=text, now_local=now.astimezone(settings.tz),
                           caller_phone=call.caller_phone, services=services, hours_text=hours_text,
-                          business_name=settings.business_name)
+                          business_name=settings.business_name,
+                          staff_names=list(db.scalars(select(Staff.name).order_by(Staff.name))))
         decision = self.brain.decide(ctx, stream.feed)
         if decision.notes is not None:
             call.session = {**(call.session or {}), "brain_notes": decision.notes}

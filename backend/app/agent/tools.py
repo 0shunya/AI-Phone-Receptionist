@@ -19,12 +19,12 @@ from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.agent.state import ALLOWED_TOOLS, COMMIT_TOOLS, HANDOFF_REASONS, State, is_clear_yes
 from app.config import get_settings
-from app.models import Booking, Call, CallOutcome, HandoffStatus, Service, ToolCall
+from app.models import Booking, Call, CallOutcome, HandoffStatus, Service, Staff, ToolCall
 from app.services import calendar as cal
 from app.services.notify import send_booking_sms
 from app.services.phone import to_e164
@@ -42,6 +42,7 @@ class FindSlotsArgs(_Args):
     service: str = Field(min_length=1, max_length=40)
     date_from: str = Field(min_length=10, max_length=16)
     date_to: str = Field(min_length=10, max_length=16)
+    staff: str | None = Field(default=None, max_length=40)
 
 
 class FindBookingsArgs(_Args):
@@ -90,10 +91,13 @@ DESCRIPTIONS = {
 def tool_schemas(db: Session, names: list[str]) -> list[dict]:
     """JSON schemas for the allowed tools only. The service enum comes from the database."""
     codes = list(db.scalars(select(Service.code).order_by(Service.code)))
+    staff_names = list(db.scalars(select(Staff.name).order_by(Staff.name)))
     props: dict[str, dict] = {
         "find_slots": {"service": {"type": "string", "enum": codes},
                        "date_from": {"type": "string", "description": "Local start, e.g. 2026-11-03 or 2026-11-03T14:00"},
-                       "date_to": {"type": "string", "description": "Local end (inclusive day), e.g. 2026-11-03"}},
+                       "date_to": {"type": "string", "description": "Local end (inclusive day), e.g. 2026-11-03"},
+                       "staff": {"type": "string", "enum": staff_names,
+                                 "description": "Only if the caller asks for a particular person"}},
         "find_bookings": {"phone_e164": {"type": "string", "description": "E.164, e.g. +919876543210"}},
         "book": {"slot_id": {"type": "string", "description": "An offered slot alias such as slot_1"},
                  "name": {"type": "string", "description": "The caller's name as they gave it"},
@@ -218,15 +222,23 @@ def find_slots(ctx: ToolContext, args: FindSlotsArgs) -> ToolResult:
     start, end = _parse_local(args.date_from, end=False), _parse_local(args.date_to, end=True)
     if end <= start or end - start > timedelta(days=15):
         raise ToolError("invalid_range", "Which day would you like to come in?")
+    staff_id = None
+    if args.staff:
+        staff_id = ctx.db.scalar(select(Staff.id).where(func.lower(Staff.name) == args.staff.lower()))
+        if staff_id is None:
+            team = list(ctx.db.scalars(select(Staff.name).order_by(Staff.name)))
+            raise ToolError("unknown_staff", f"Sorry, I don't know that name. Our team is {', '.join(team[:-1])} "
+                                             f"and {team[-1]}.")
     target = session.get("target_booking")
-    slots = cal.find_free_slots(ctx.db, service, start, end, now=ctx.now, limit=SEARCH_LIMIT,
+    slots = cal.find_free_slots(ctx.db, service, start, end, now=ctx.now, limit=SEARCH_LIMIT, staff_id=staff_id,
                                 exclude_booking=uuid.UUID(target) if target else None)
     session["service"] = service.code
     session.setdefault("intent", "book")
     if not slots:
         session["offered_slots"] = {}
         ctx.call.session = session
-        return ToolResult(True, f"I'm sorry, there are no {service.name.lower()} openings then. "
+        who = f" with {args.staff.capitalize()}" if args.staff else ""
+        return ToolResult(True, f"I'm sorry, there are no {service.name.lower()} openings{who} then. "
                                 "Would another day work for you?", data={"slots": []})
     say = _offer(ctx, session, slots, service)
     ctx.call.session = session
@@ -239,6 +251,8 @@ def find_bookings(ctx: ToolContext, args: FindBookingsArgs) -> ToolResult:
     bookings = cal.upcoming_bookings(ctx.db, phone, now=ctx.now)
     tz = get_settings().tz
     session["phone"] = phone
+    if bookings:
+        session["name"] = bookings[0].customer.name
     session["bookings"] = {
         f"booking_{i}": {"booking_id": str(b.id), "service": b.service.code, "staff": b.staff.name,
                          "when": say_when(b.starts_at, tz, ctx.now)} for i, b in enumerate(bookings, start=1)}

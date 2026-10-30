@@ -27,6 +27,7 @@ class TurnContext:
     services: list[dict]                 # {code, name, duration_min, price}
     hours_text: str
     business_name: str
+    staff_names: list[str] = field(default_factory=list)
 
 
 @dataclass

@@ -84,7 +84,8 @@ def parse_range(words: str, now: datetime) -> tuple[str, str] | None:
         start = "12:00"
     elif " evening " in words:
         start = "17:00"
-    time_match = re.search(r" (?:at|after|around|from|by) (\d{1,2})(?::(\d{2}))? ?(am|pm|a m|p m)? ", words)
+    # _words() has already turned "10:30" into "10 30".
+    time_match = re.search(r" (?:at|after|around|from|by) (\d{1,2})(?: (\d{2}))? ?(am|pm|a m|p m)? ", words)
     if time_match:
         hour, minute = int(time_match.group(1)), int(time_match.group(2) or 0)
         meridiem = (time_match.group(3) or "").replace(" ", "")
@@ -97,13 +98,21 @@ def parse_range(words: str, now: datetime) -> tuple[str, str] | None:
 
 
 def parse_name(raw: str, awaiting: bool) -> str | None:
-    match = re.search(r"(?:my name is|my name's|name is|this is|it's|it is|i am|i'm|call me|under|for)\s+"
-                      r"([A-Za-z][A-Za-z'\-]+(?:\s+[A-Za-z][A-Za-z'\-]+)?)", raw, re.I)
-    candidate = match.group(1) if match else (raw.strip(" .!?,") if awaiting else None)
-    if not candidate:
-        return None
+    pattern = (r"(?:my name is|my name's|name is|name's|this is|it's|it is|i am|i'm|call me|under|for)\s+"
+               r"([A-Za-z][A-Za-z'\-]+(?:\s+[A-Za-z][A-Za-z'\-]+)?)")
+    candidates = [m.group(1) for m in re.finditer(pattern, raw, re.I)]
+    if awaiting:
+        candidates.append(raw.strip(" .!?,"))
+    for candidate in candidates:
+        if name := _clean_name(candidate):
+            return name
+    return None
+
+
+def _clean_name(candidate: str) -> str | None:
     parts = [p for p in re.split(r"\s+", candidate) if p]
-    if not parts or len(parts) > 2 or parts[0].lower() in NAME_STOP or not all(re.fullmatch(r"[A-Za-z'\-]+", p) for p in parts):
+    if not parts or len(parts) > 2 or parts[0].lower() in NAME_STOP or not all(
+            re.fullmatch(r"[A-Za-z'\-]+", p) for p in parts):
         return None
     parts = [p for p in parts if p.lower() not in NAME_STOP and p.lower() not in WEEKDAYS]
     return " ".join(p.capitalize() for p in parts) or None
@@ -170,9 +179,14 @@ class RuleBrain:
         elif re.search(r" (reschedule|move|change|push|shift|postpone|rearrange|different time|different day) ", words) \
                 and ctx.state not in ("CONFIRM", "CHECK_SLOTS"):
             notes["intent"] = "reschedule"
-        elif re.search(r" (book|booking|appointment|slot|available|availability|come in|get a|need a|want a|"
-                       r"like a|haircut|trim|colour|color|manicure) ", words) and not notes.get("intent"):
+        elif re.search(r" (book a|book me|make a|new appointment|get a|get my|have a|need a|want a|like a) ", words):
+            notes["intent"] = "book"     # an explicit new request overrides an earlier one
+        elif re.search(r" (book|booking|appointment|slot|available|availability|come in|haircut|trim|colour|"
+                       r"color|manicure) ", words) and not notes.get("intent"):
             notes["intent"] = "book"
+        staff = next((s for s in ctx.staff_names if f" {s.lower()} " in words), None)
+        if staff and ctx.state not in ("CHECK_SLOTS", "CONFIRM"):
+            notes["staff"] = staff
         service = parse_service(words)
         if service:
             notes["service"] = service
@@ -233,11 +247,12 @@ class RuleBrain:
                 if not choice:
                     return ask("Which of those times would suit you?", understood=bool(name or spoken_phone))
                 notes["choice"] = choice
-                if not notes.get("name"):
+                known_name = notes.get("name") or session.get("name")
+                if not known_name:
                     return ask("Great. Can I take your name, please?", "name")
                 if not phone:
                     return ask("And what's the best number for the confirmation text?", "phone")
-                return call("book", slot_id=choice, name=notes["name"], phone_e164=phone)
+                return call("book", slot_id=choice, name=known_name, phone_e164=phone)
             if not notes.get("service"):
                 return ask("Sure. Which service would you like: a haircut, beard trim, colour or manicure?", "service")
             if not notes.get("range"):
@@ -255,7 +270,8 @@ class RuleBrain:
             return ask("Which service is it for?", "service")
         notes.pop("choice", None)
         date_from, date_to = notes["range"]
-        return call("find_slots", service=notes["service"], date_from=date_from, date_to=date_to)
+        extra = {"staff": notes["staff"]} if notes.get("staff") else {}
+        return call("find_slots", service=notes["service"], date_from=date_from, date_to=date_to, **extra)
 
     @staticmethod
     def _booking_choice(words: str, session: dict) -> str:
