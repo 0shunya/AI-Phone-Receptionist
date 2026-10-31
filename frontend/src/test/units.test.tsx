@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { StateStrip, ToolCallList } from "../components/callbits";
 import { addDays, compactArgs, isoDay, localTime, minutesOfDay, ms } from "../lib/format";
-import { isEcho } from "../lib/useCall";
+import { closeMessage, isEcho } from "../lib/useCall";
 
 describe("format", () => {
   it("shows UTC instants in the salon's local time", () => {
@@ -52,5 +52,14 @@ describe("call widgets", () => {
     expect(screen.getByText("unknown_slot")).toBeInTheDocument();
     expect(screen.getByLabelText("refused")).toBeInTheDocument();
     expect(screen.getByText("guard rule")).toBeInTheDocument();
+  });
+});
+
+describe("stream close codes", () => {
+  it("explains server refusals and stays quiet on a normal close", () => {
+    expect(closeMessage(4401)).toMatch(/access code/);
+    expect(closeMessage(4403)).toMatch(/FRONTEND_ORIGIN/);
+    expect(closeMessage(4404)).toMatch(/no longer exists/);
+    expect(closeMessage(1000)).toBeNull();
   });
 });

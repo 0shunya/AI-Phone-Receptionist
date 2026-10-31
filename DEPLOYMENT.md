@@ -101,8 +101,11 @@ traffic; the first request after that takes roughly a minute while it wakes, so 
   (`streamUrl` in `frontend/src/lib/api.ts`). Render's proxy supports WebSockets on the same service and port; no
   extra configuration.
 - **Origin**: CORS does not cover WebSockets, so `WS /api/voice/stream` itself refuses any `Origin` header that is
-  not in `FRONTEND_ORIGIN` (close code 4403; `test_voice_stream_refuses_foreign_origins`). HTTP calls use normal
-  CORS from the same setting.
+  not in `FRONTEND_ORIGIN` (close code 4403; `test_voice_stream_refuses_foreign_origins`). Refusals accept the
+  socket and then close with the code, so the browser can read it and the Call page explains it. HTTP calls use normal
+  CORS from the same setting. CORS is the outermost middleware, so even the 401 from the access-code gate carries
+  `Access-Control-Allow-Origin` and the browser can show the access-code screen
+  (`test_access_code_401_still_carries_cors_headers`).
 - **Access code**: a browser cannot set headers on a WebSocket, so the code travels as `?code=` on the stream URL;
   HTTP calls send `X-Access-Code`. Missing or wrong code: HTTP 401, WebSocket close 4401
   (`test_access_code_guards_api_and_stream`). The code is a demo gate, not user authentication.

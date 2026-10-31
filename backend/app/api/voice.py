@@ -63,25 +63,32 @@ def _call_open(call_id: uuid.UUID) -> bool:
         return call is not None and call.ended_at is None
 
 
+async def _refuse(ws: WebSocket, code: int, reason: str) -> None:
+    """Accept, then close with an application code. Closing before accepting becomes an HTTP 403 on the handshake,
+    and the browser would only see close code 1006 with no way to tell the caller what went wrong."""
+    await ws.accept()
+    await ws.close(code=code, reason=reason)
+
+
 @router.websocket("/voice/stream")
 async def voice_stream(ws: WebSocket, call_id: str, code: str | None = None):
     # CORS does not apply to WebSockets, so a browser on any site could open this socket. Refuse foreign origins
     # (non-browser clients send no Origin and are still gated by the access code below).
     origin = (ws.headers.get("origin") or "").rstrip("/")
     if origin and origin not in get_settings().cors_origins:
-        await ws.close(code=4403, reason="origin not allowed")
+        await _refuse(ws, 4403, "origin not allowed")
         return
     expected = get_settings().demo_access_code
     if expected and not hmac.compare_digest((code or "").encode(), expected.encode()):
-        await ws.close(code=4401, reason="access code required")
+        await _refuse(ws, 4401, "access code required")
         return
     try:
         cid = uuid.UUID(call_id)
     except ValueError:
-        await ws.close(code=4404, reason="no such call")
+        await _refuse(ws, 4404, "no such call")
         return
     if not await asyncio.to_thread(_call_open, cid):
-        await ws.close(code=4404, reason="no such call")
+        await _refuse(ws, 4404, "no such call")
         return
     await ws.accept()
     loop = asyncio.get_running_loop()
@@ -145,8 +152,12 @@ async def voice_stream(ws: WebSocket, call_id: str, code: str | None = None):
         log.exception("voice stream failed", extra={"call_id": call_id})
     finally:
         reader_task.cancel()
-        # A closed tab or dropped connection is a hang-up (end_call is idempotent).
-        await asyncio.to_thread(_end, cid)
+        # A closed tab or dropped connection is a hang-up (end_call is idempotent). Called synchronously: the
+        # handler may already be cancelled here, and awaiting a thread could be cut short. It is one quick UPDATE.
+        try:
+            _end(cid)
+        except Exception:
+            log.exception("could not end call after disconnect", extra={"call_id": call_id})
         try:
             await ws.close()
         except RuntimeError:

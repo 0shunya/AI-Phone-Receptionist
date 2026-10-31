@@ -117,9 +117,10 @@ def test_voice_stream_sentences_metrics_barge_in_and_hangup(client):
 
 def test_voice_stream_rejects_unknown_call(client):
     from starlette.websockets import WebSocketDisconnect
-    with pytest.raises(WebSocketDisconnect):
+    with pytest.raises(WebSocketDisconnect) as closed:
         with client.websocket_connect("/api/voice/stream?call_id=00000000-0000-0000-0000-000000000000") as ws:
             ws.receive_json()
+    assert closed.value.code == 4404   # accepted then closed, so the browser can read the code
 
 
 def test_access_code_guards_api_and_stream(client, settings_override):
@@ -132,9 +133,10 @@ def test_access_code_guards_api_and_stream(client, settings_override):
         assert guarded.get("/api/calls", headers={"X-Access-Code": "letmein"}).status_code == 200
         cid = guarded.post("/api/voice/incoming", json={}, headers={"X-Access-Code": "letmein"}).json()["call_id"]
         from starlette.websockets import WebSocketDisconnect
-        with pytest.raises(WebSocketDisconnect):
+        with pytest.raises(WebSocketDisconnect) as closed:
             with guarded.websocket_connect(f"/api/voice/stream?call_id={cid}") as ws:
                 ws.receive_json()
+        assert closed.value.code == 4401
         with guarded.websocket_connect(f"/api/voice/stream?call_id={cid}&code=letmein") as ws:
             ws.send_json({"type": "hangup"})
             assert ws.receive_json()["type"] == "ended"
@@ -159,7 +161,7 @@ def test_closing_the_stream_ends_the_call(client):
         while ws.receive_json()["type"] != "turn_done":
             pass
     import time
-    for _ in range(20):   # the server notices the disconnect asynchronously
+    for _ in range(50):   # the server notices the disconnect asynchronously (up to 5 s)
         if client.get(f"/api/calls/{cid}").json()["ended_at"]:
             break
         time.sleep(0.1)
@@ -169,9 +171,29 @@ def test_closing_the_stream_ends_the_call(client):
 def test_voice_stream_refuses_foreign_origins(client):
     from starlette.websockets import WebSocketDisconnect
     cid = client.post("/api/voice/incoming", json={"caller_phone": PHONE}).json()["call_id"]
-    with pytest.raises(WebSocketDisconnect):
+    with pytest.raises(WebSocketDisconnect) as closed:
         with client.websocket_connect(f"/api/voice/stream?call_id={cid}", headers={"origin": "https://evil.example"}) as ws:
             ws.receive_json()
+    assert closed.value.code == 4403
     with client.websocket_connect(f"/api/voice/stream?call_id={cid}", headers={"origin": "http://localhost:5174"}) as ws:
         ws.send_json({"type": "hangup"})
         assert ws.receive_json()["type"] == "ended"
+
+
+def test_access_code_401_still_carries_cors_headers(client, settings_override):
+    """Cross-origin, a 401 without Access-Control-Allow-Origin looks like a network error to the browser, and the
+    access-code screen never shows (a production bug in Build 02). CORS must wrap the access-code gate."""
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+    origin = "https://receptionist.example.app"
+    settings_override(demo_access_code="letmein", frontend_origin=origin)
+    with TestClient(create_app()) as guarded:
+        denied = guarded.get("/api/calls", headers={"Origin": origin})
+        assert denied.status_code == 401 and denied.json()["error"]["code"] == "access_code_required"
+        assert denied.headers.get("access-control-allow-origin") == origin
+        preflight = guarded.options("/api/calls", headers={"Origin": origin, "Access-Control-Request-Method": "GET",
+                                                           "Access-Control-Request-Headers": "x-access-code"})
+        assert preflight.status_code == 200 and preflight.headers.get("access-control-allow-origin") == origin
+        ok = guarded.get("/api/calls", headers={"Origin": origin, "X-Access-Code": "letmein"})
+        assert ok.status_code == 200 and ok.headers.get("access-control-allow-origin") == origin

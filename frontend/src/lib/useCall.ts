@@ -54,6 +54,17 @@ export function isEcho(heard: string, speaking: string): boolean {
   return h.filter((w) => spoken.has(w)).length / h.length >= 0.6;
 }
 
+/** The server accepts and then closes with these codes, so the reason survives a cross-origin connection. */
+export function closeMessage(code: number): string | null {
+  switch (code) {
+    case 4401: return "The access code was not accepted. Reload the page and enter it again.";
+    case 4403: return "This site is not allowed to open the call stream (the API's FRONTEND_ORIGIN does not list it).";
+    case 4404: return "This call no longer exists. Start a new one.";
+    case 1006: return "The call connection dropped. Check your connection and start a new call.";
+    default: return null;
+  }
+}
+
 let lineId = 1;
 
 export function useCall() {
@@ -266,8 +277,10 @@ export function useCall() {
         setOutcome(msg.outcome);
       }
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       setThinking(false);
+      const reason = closeMessage(event.code);
+      if (reason) setError(reason);
       if (statusRef.current === "live" || statusRef.current === "connecting") {
         setStatus("ended");
         listen.current = false;

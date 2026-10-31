@@ -33,10 +33,6 @@ def create_app() -> FastAPI:
     app = FastAPI(title="AI Phone Receptionist API", version=__version__,
                   docs_url="/docs" if settings.app_env != "production" else None)
     install_error_handlers(app)
-    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False,
-                       allow_methods=["GET", "POST", "PATCH"],
-                       allow_headers=["Content-Type", "Idempotency-Key", "X-Access-Code", "X-Request-Id"],
-                       expose_headers=["X-Request-Id"], max_age=600)
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
@@ -58,6 +54,14 @@ def create_app() -> FastAPI:
                                        "status": response.status_code,
                                        "duration_ms": round((time.perf_counter() - started) * 1000)})
         return response
+
+    # Added last so it is the OUTERMOST layer. Otherwise responses that request_context returns itself (the 401
+    # access-code gate) carry no Access-Control-Allow-Origin, and a cross-origin browser sees only a network error,
+    # so the access-code screen never appears. This bit the Expense Scanner in production.
+    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False,
+                       allow_methods=["GET", "POST", "PATCH"],
+                       allow_headers=["Content-Type", "Idempotency-Key", "X-Access-Code", "X-Request-Id"],
+                       expose_headers=["X-Request-Id"], max_age=600)
 
     app.include_router(router)
     app.include_router(voice.router)
