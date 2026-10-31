@@ -24,7 +24,7 @@ flowchart LR
     CAL["Calendar<br/>services/calendar.py"]
     SMS["SMS outbox<br/>services/notify.py"]
   end
-  GEM[(Gemini<br/>gemini-3.5-flash-lite)]
+  GEM[(Gemini<br/>GEMINI_MODEL)]
   subgraph PG["PostgreSQL"]
     BK[(bookings<br/>EXCLUDE no overlap)]
     LOG[(calls, turns,<br/>tool_calls, model_calls)]

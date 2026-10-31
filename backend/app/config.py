@@ -21,14 +21,14 @@ class Settings(BaseSettings):
     # used by the offline evaluation and as a no-key fallback for demos).
     agent_brain: Literal["gemini", "rules"] = "gemini"
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_model: str = "gemini-3-flash-preview"
     gemini_thinking_level: Literal["minimal", "low", "medium", "high"] = "minimal"
     agent_temperature: float = Field(default=0.3, ge=0, le=2)
     agent_max_output_tokens: int = Field(default=400, ge=64, le=4096)
     agent_history_turns: int = Field(default=12, ge=2, le=50)
     model_timeout_seconds: float = Field(default=20, ge=2, le=120)
     model_max_attempts: int = Field(default=2, ge=1, le=5)
-    daily_model_call_limit: int = Field(default=300, ge=0)
+    daily_model_call_limit: int = Field(default=15, ge=0)   # model calls per rolling 24 h (free tier: ~20/day/model)
     # USD per million tokens, used to fill model_calls.cost_usd. Unset on the free tier, so cost stays null
     # rather than showing an invented number.
     model_price_in_per_mtok: float | None = None

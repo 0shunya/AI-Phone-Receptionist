@@ -65,6 +65,12 @@ def _call_open(call_id: uuid.UUID) -> bool:
 
 @router.websocket("/voice/stream")
 async def voice_stream(ws: WebSocket, call_id: str, code: str | None = None):
+    # CORS does not apply to WebSockets, so a browser on any site could open this socket. Refuse foreign origins
+    # (non-browser clients send no Origin and are still gated by the access code below).
+    origin = (ws.headers.get("origin") or "").rstrip("/")
+    if origin and origin not in get_settings().cors_origins:
+        await ws.close(code=4403, reason="origin not allowed")
+        return
     expected = get_settings().demo_access_code
     if expected and not hmac.compare_digest((code or "").encode(), expected.encode()):
         await ws.close(code=4401, reason="access code required")

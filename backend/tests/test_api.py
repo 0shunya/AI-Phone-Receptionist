@@ -164,3 +164,14 @@ def test_closing_the_stream_ends_the_call(client):
             break
         time.sleep(0.1)
     assert client.get(f"/api/calls/{cid}").json()["ended_at"] is not None
+
+
+def test_voice_stream_refuses_foreign_origins(client):
+    from starlette.websockets import WebSocketDisconnect
+    cid = client.post("/api/voice/incoming", json={"caller_phone": PHONE}).json()["call_id"]
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(f"/api/voice/stream?call_id={cid}", headers={"origin": "https://evil.example"}) as ws:
+            ws.receive_json()
+    with client.websocket_connect(f"/api/voice/stream?call_id={cid}", headers={"origin": "http://localhost:5174"}) as ws:
+        ws.send_json({"type": "hangup"})
+        assert ws.receive_json()["type"] == "ended"

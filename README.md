@@ -63,7 +63,7 @@ In every live model failure above, the safeguards held: nothing was booked that 
 flowchart LR
   Caller((Caller)) --> B[Browser<br/>Web Speech STT, turn end,<br/>TTS per sentence, barge-in]
   B <-- "WS /api/voice/stream<br/>transcripts up, sentences down" --> E[Engine<br/>state machine + guards]
-  E --> G[Model gateway] --> M[(Gemini<br/>3.5 Flash-Lite)]
+  E --> G[Model gateway] --> M[(Gemini)]
   E --> T[Tool router<br/>validates every argument]
   T --> C[(Postgres calendar<br/>EXCLUDE no overlap)]
   T --> S[SMS outbox]
@@ -75,7 +75,7 @@ flowchart LR
 |---|---|
 | Telephony | None: the browser is the phone (a real number was out of scope; see DEPLOYMENT.md) |
 | Speech | Browser Web Speech API (recognition + synthesis); the agent server never sees audio |
-| Model | Gemini `gemini-3.5-flash-lite`, streamed, through one gateway that logs every attempt |
+| Model | Gemini, streamed, through one gateway that logs every attempt. Evaluated on `gemini-3.5-flash-lite`; the deployment default is `gemini-3-flash-preview` so it has its own free-tier quota (live-tested at 1.2 to 1.7 s per turn, but not run through the scenario evaluation) |
 | Agent | A plain loop: code-owned state machine, one tool per turn, tool results spoken directly |
 | Calendar | Built-in: staff shifts + a `bookings` table with a Postgres exclusion constraint |
 | Backend | FastAPI, SQLAlchemy 2, Alembic, PostgreSQL 16 |
